@@ -1,0 +1,1773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Universal 3D Fix Pro • Three Dee Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .drop-zone.active { border-color: #22d3ee; background: rgba(34, 211, 238, 0.08); }
+    #viewer-container canvas { display: block; outline: none; }
+    .stat-card { transition: all 0.15s ease; }
+    .issue-ok { color: #34d399; }
+    .issue-warn { color: #fbbf24; }
+    .issue-bad { color: #f87171; }
+    .progress-bar { transition: width 0.35s ease; }
+    .material-swatch { width: 28px; height: 28px; border-radius: 9999px; border: 2px solid transparent; cursor: pointer; transition: all 0.15s; }
+    .material-swatch.active { border-color: #22d3ee; box-shadow: 0 0 0 2px rgba(34,211,238,0.35); transform: scale(1.08); }
+    .material-swatch:hover { transform: scale(1.1); }
+    .viewer-overlay { pointer-events: none; }
+    .viewer-overlay button, .viewer-overlay .interactive { pointer-events: auto; }
+    .toolbar-btn { 
+      width: 36px; height: 36px; 
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 10px; 
+      background: rgba(30,41,59,0.85); 
+      border: 1px solid rgba(51,65,85,0.8);
+      color: #94a3b8;
+      transition: all 0.15s;
+    }
+    .toolbar-btn:hover { background: rgba(51,65,85,0.95); color: #e2e8f0; }
+    .toolbar-btn.active { background: #0891b2; color: white; border-color: #22d3ee; }
+    .success-pulse { animation: pulse-success 1.2s ease-out; }
+    @keyframes pulse-success {
+      0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5); }
+      70% { box-shadow: 0 0 0 12px rgba(52, 211, 153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    }
+    
+    /* Markdown Styles for AI Response */
+    .ai-prose p { margin-bottom: 0.75em; line-height: 1.5; }
+    .ai-prose ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.75em; }
+    .ai-prose ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.75em; }
+    .ai-prose strong { color: #f8fafc; font-weight: 600; }
+    .ai-prose h1, .ai-prose h2, .ai-prose h3 { font-weight: 600; color: #a5b4fc; margin-top: 1em; margin-bottom: 0.5em; }
+    .ai-prose h2 { font-size: 1.1em; }
+
+    /* Hide scrollbar for clean UI */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-semibold tracking-tight leading-none">Universal 3D Fix Pro</h1>
+          <p class="text-xs text-slate-400 mt-0.5">Three Dee Lab • AI-Powered mesh repair</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-xs text-slate-400">
+        <span class="hidden sm:inline">100% private • Files never leave your device</span>
+        <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Local</span>
+        <button id="btn-api-settings" class="ml-2 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors flex items-center gap-1 cursor-pointer shadow-sm">
+          <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4v-3.252a1 1 0 01.293-.707l8.192-8.192A6 6 0 0117 7z"></path></svg>
+          AI Settings
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Left column -->
+    <div class="lg:col-span-4 flex flex-col space-y-5 max-h-none lg:max-h-[calc(100vh-120px)] overflow-y-auto pr-2 pb-8">
+      <!-- Drop zone -->
+      <div id="drop-zone"
+           class="drop-zone border-2 border-dashed border-slate-700 rounded-xl p-8 text-center cursor-pointer hover:border-cyan-500/60 transition-colors bg-slate-900/50 shrink-0">
+        <div class="flex flex-col items-center gap-3">
+          <div class="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center">
+            <svg class="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+          </div>
+          <div>
+            <p class="font-medium text-slate-200">Drop 3D Model Here</p>
+            <p class="text-sm text-slate-500 mt-1">or click to browse</p>
+          </div>
+          <p class="text-xs text-slate-600">Supports STL, OBJ, PLY, GLTF, 3MF</p>
+        </div>
+        <input type="file" id="file-input" accept=".stl,.obj,.ply,.gltf,.glb,.3mf" class="hidden" />
+      </div>
+
+      <!-- File info -->
+      <div id="file-info" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-4 shrink-0">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-slate-200 truncate" id="file-name">—</p>
+            <p class="text-xs text-slate-500 mt-0.5" id="file-size">—</p>
+          </div>
+          <button id="btn-clear" class="text-xs text-slate-400 hover:text-red-400 transition-colors shrink-0 bg-red-400/10 hover:bg-red-400/20 px-2.5 py-1 rounded-md">Clear</button>
+        </div>
+      </div>
+
+      <!-- User Messaging Modal -->
+      <div id="message-box" class="hidden bg-slate-800 border border-slate-700 rounded-xl p-4 shrink-0">
+        <p id="message-box-text" class="text-sm text-slate-200"></p>
+        <button onclick="document.getElementById('message-box').classList.add('hidden')" class="mt-3 text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded transition-colors">Dismiss</button>
+      </div>
+
+      <!-- Progress / Status -->
+      <div id="progress-panel" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 shrink-0">
+        <div class="flex items-center justify-between text-sm">
+          <span id="progress-label" class="text-slate-300">Processing…</span>
+          <span id="progress-pct" class="text-cyan-400 font-medium">0%</span>
+        </div>
+        <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+          <div id="progress-bar" class="progress-bar h-full bg-cyan-500 rounded-full" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Success banner -->
+      <div id="success-banner" class="hidden bg-emerald-500/10 border border-emerald-500/40 rounded-xl p-4 flex items-start gap-3 success-pulse shrink-0">
+        <div class="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-emerald-300">Repair complete</p>
+          <p class="text-xs text-emerald-400/80 mt-0.5" id="success-detail">Mesh cleaned and ready for download.</p>
+        </div>
+      </div>
+
+      <!-- Repair actions (Always visible, but initially disabled) -->
+      <div id="actions-panel" class="space-y-3 shrink-0">
+        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Tools & Repair</h2>
+        <div class="space-y-2">
+          <button id="btn-ai-autofix" disabled class="w-full py-3 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-indigo-900/30 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            AI Smart Fix (Beta)
+          </button>
+          <div class="flex items-center text-xs text-slate-500 py-1">
+             <div class="flex-1 border-t border-slate-700"></div>
+             <span class="px-2 uppercase tracking-wider">OR MANUAL</span>
+             <div class="flex-1 border-t border-slate-700"></div>
+          </div>
+          <button id="btn-analyze" disabled class="w-full py-2.5 px-4 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            Re-analyze Mesh
+          </button>
+          <button id="btn-weld" disabled class="w-full py-2.5 px-4 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            Weld Duplicate Vertices
+          </button>
+          <button id="btn-clean" disabled class="w-full py-2.5 px-4 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            Remove Degenerates & Duplicates
+          </button>
+          <button id="btn-normals" disabled class="w-full py-2.5 px-4 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            Fix & Orient Normals
+          </button>
+          <button id="btn-auto" disabled class="w-full py-2.5 px-4 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-cyan-900/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none">
+            Basic Auto Repair
+          </button>
+        </div>
+        <div class="pt-2 border-t border-slate-800 flex gap-2">
+          <select id="export-format" disabled class="bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-1/3 p-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+            <option value="stl">STL (Binary)</option>
+            <option value="obj">OBJ</option>
+            <option value="ply">PLY</option>
+            <option value="glb">GLB</option>
+            <option value="3mf">3MF</option>
+          </select>
+          <button id="btn-download" disabled class="w-2/3 py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            Download Fixed Model
+          </button>
+        </div>
+      </div>
+
+      <!-- Analysis -->
+      <div id="analysis-panel" class="hidden space-y-3 shrink-0 pt-2 border-t border-slate-800">
+        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Topology Analysis</h2>
+        <div class="grid grid-cols-2 gap-2" id="stats-grid"></div>
+        <div id="issues-list" class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2 text-sm"></div>
+
+        <!-- Printability indicator -->
+        <div id="printability-card" class="rounded-xl p-4 border flex items-center gap-3">
+          <div id="print-icon" class="w-10 h-10 rounded-full flex items-center justify-center shrink-0"></div>
+          <div>
+            <p class="text-sm font-semibold" id="print-title">—</p>
+            <p class="text-xs mt-0.5" id="print-desc">—</p>
+          </div>
+        </div>
+
+        <!-- AI Help Panel -->
+        <div id="ai-help-panel" class="bg-indigo-900/20 border border-indigo-500/30 rounded-xl p-4 relative overflow-hidden mt-4">
+          <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+          <h3 class="text-xs font-bold text-indigo-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+            Ask AI for Slicer Advice
+          </h3>
+          <p class="text-xs text-slate-400 mb-3">Get expert advice on how to orient this model on your print bed, or what software to use for advanced topology modifications.</p>
+          <button id="btn-ai-review" class="w-full py-2 px-3 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 text-xs font-semibold transition-colors">
+            Get Slicer Recommendations
+          </button>
+          
+          <div id="ai-response-container" class="hidden mt-4 pt-4 border-t border-indigo-500/20 text-xs text-slate-300 ai-prose">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: Viewer -->
+    <div class="lg:col-span-8 h-[60vh] lg:h-[calc(100vh-100px)]">
+      <div id="viewer-wrapper" class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden relative flex flex-col w-full h-full shadow-inner transition-all duration-300">
+        <div id="viewer-container" class="w-full h-full flex-1 touch-none"></div>
+
+        <!-- Top-left topology + printability overlay -->
+        <div id="viewer-stats" class="viewer-overlay absolute top-3 left-3 space-y-2 hidden">
+          <div class="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-3.5 py-2.5 text-xs">
+            <div class="flex justify-between gap-6">
+              <span class="text-slate-400">Topology</span>
+              <span class="text-slate-200 font-medium">Triangle</span>
+            </div>
+            <div class="flex justify-between gap-6 mt-1">
+              <span class="text-slate-400">Faces</span>
+              <span class="text-slate-200 font-medium" id="overlay-faces">—</span>
+            </div>
+            <div class="flex justify-between gap-6 mt-1">
+              <span class="text-slate-400">Vertices</span>
+              <span class="text-slate-200 font-medium" id="overlay-verts">—</span>
+            </div>
+          </div>
+
+          <div id="overlay-print" class="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl px-3.5 py-2.5 text-xs flex items-center gap-2">
+            <span class="text-slate-400">Printability</span>
+            <span id="overlay-print-icon" class="ml-auto"></span>
+          </div>
+        </div>
+
+        <!-- Vertical Transform Toolbar (Move, Rotate, Scale) -->
+        <div id="transform-toolbar" class="viewer-overlay absolute top-1/2 left-3 -translate-y-1/2 flex flex-col gap-1.5 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 hidden">
+          <button class="toolbar-btn transform-btn interactive" data-mode="translate" title="Move">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 4H14M4 10V14M20 10V14M10 20H14M12 4V20M4 12H20M12 4L9 7M12 4L15 7M4 12L7 9M4 12L7 15M20 12L17 9M20 12L17 15M12 20L9 17M12 20L15 17"/></svg>
+          </button>
+          <button class="toolbar-btn transform-btn interactive" data-mode="rotate" title="Rotate">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          </button>
+          <button class="toolbar-btn transform-btn interactive" data-mode="scale" title="Scale">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+          </button>
+        </div>
+
+        <!-- Top-right material swatches -->
+        <div id="material-swatches" class="viewer-overlay absolute top-3 right-3 flex items-center gap-2 hidden p-2 bg-black/40 backdrop-blur-md rounded-2xl border border-white/10">
+          <button class="material-swatch interactive hidden" id="swatch-original" data-mat="original" style="background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);" title="Original Texture/Colors"></button>
+          <button class="material-swatch interactive active" data-mat="clay" style="background: linear-gradient(135deg, #d6d3d1, #a8a29e);" title="Clay"></button>
+          <button class="material-swatch interactive" data-mat="white" style="background: #f8fafc;" title="White"></button>
+          <button class="material-swatch interactive" data-mat="black" style="background: #1e293b;" title="Dark"></button>
+          <button class="material-swatch interactive" data-mat="cyan" style="background: linear-gradient(135deg, #22d3ee, #0891b2);" title="Cyan"></button>
+          <button class="material-swatch interactive" data-mat="purple" style="background: linear-gradient(135deg, #a78bfa, #7c3aed);" title="Purple"></button>
+        </div>
+
+        <!-- Bottom toolbar -->
+        <div id="viewer-toolbar" class="viewer-overlay absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl px-2 py-1.5 hidden flex-wrap justify-center w-max max-w-[90%]">
+          <button class="toolbar-btn interactive" id="btn-wireframe" title="Wireframe">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <button class="toolbar-btn interactive active" id="btn-solid" title="Solid">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          </button>
+          <div class="w-px h-5 bg-white/15 mx-0.5"></div>
+          <button class="toolbar-btn interactive" id="btn-reset-cam" title="Reset camera">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          </button>
+          <button class="toolbar-btn interactive" id="btn-fit" title="Fit to view">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+          </button>
+          <div class="w-px h-5 bg-white/15 mx-0.5"></div>
+          <button class="toolbar-btn interactive" id="btn-fullscreen" title="Full Screen View">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8V4m0 0h4M3 4l6 6M21 8V4m0 0h-4m4 0l-6 6M3 16v4m0 0h4m-4 0l6-6m12 6v-4m0 4h-4m4 0l-6-6"/></svg>
+          </button>
+        </div>
+
+        <!-- Empty state -->
+        <div id="viewer-empty" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 pointer-events-none">
+          <svg class="w-16 h-16 mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+          </svg>
+          <p class="text-sm">Upload a mesh to preview</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="max-w-7xl mx-auto px-4 py-6 text-center text-xs text-slate-600 border-t border-slate-900 mt-8">
+    Universal 3D Fix Pro • Three Dee Lab • Built for local 3D-printing workflows
+  </footer>
+
+  <!-- AI Provider Settings Modal -->
+  <div id="api-key-modal" class="fixed inset-0 z-[100] hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      <h3 class="text-lg font-semibold text-white mb-2">Configure AI Provider</h3>
+      <p class="text-sm text-slate-400 mb-4">Choose any AI provider. Your API key is stored only in your browser's local storage and never leaves your device.</p>
+      
+      <label class="block text-xs font-medium text-slate-400 mb-1.5">Provider</label>
+      <select id="ai-provider-select" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 mb-4">
+        <option value="gemini">Google Gemini</option>
+        <option value="openai">OpenAI (GPT)</option>
+        <option value="xai">xAI Grok</option>
+        <option value="anthropic">Anthropic Claude</option>
+        <option value="custom">Custom (OpenAI-compatible)</option>
+      </select>
+
+      <label class="block text-xs font-medium text-slate-400 mb-1.5">API Key</label>
+      <input type="password" id="api-key-input" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 mb-4" placeholder="sk-... or AIzaSy..." />
+
+      <div id="custom-fields" class="hidden space-y-3 mb-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5">Base URL</label>
+          <input type="text" id="ai-base-url" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" placeholder="https://api.example.com/v1" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5">Model Name</label>
+          <input type="text" id="ai-model-name" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" placeholder="gpt-4o, claude-3-5-sonnet, etc." />
+        </div>
+      </div>
+
+      <div id="model-preset" class="mb-4">
+        <label class="block text-xs font-medium text-slate-400 mb-1.5">Model (optional override)</label>
+        <input type="text" id="ai-model-override" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" placeholder="Leave blank for default" />
+      </div>
+
+      <p class="text-xs text-slate-500 mb-4">Supported: Gemini, OpenAI, xAI Grok, Claude, and any OpenAI-compatible endpoint (Together, Groq, Ollama, Fireworks, etc.)</p>
+
+      <div class="flex justify-end gap-3">
+        <button id="btn-api-cancel" class="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors">Cancel</button>
+        <button id="btn-api-save" class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TransformControls } from 'three/addons/controls/TransformControls.js';
+    
+    // Loaders
+    import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+    import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+    import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
+
+    // Exporters
+    import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+    import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+    import { PLYExporter } from 'three/addons/exporters/PLYExporter.js';
+    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+    // Set Z-Up globally
+    THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
+
+    // ---------- State ----------
+    let scene, camera, renderer, controls, transformControl, currentMesh = null;
+    let currentGeometry = null;
+    let originalFileName = 'model';
+    let wireframeMode = false;
+    let currentMaterialKey = 'clay';
+    let originalHasColors = false;
+    let lastAnalysis = null;
+
+    // AI Provider state (multi-provider support)
+    let aiProvider = localStorage.getItem('ai_provider') || 'gemini';
+    let aiApiKey = localStorage.getItem('ai_api_key') || localStorage.getItem('gemini_api_key') || '';
+    let aiBaseUrl = localStorage.getItem('ai_base_url') || '';
+    let aiModel = localStorage.getItem('ai_model') || '';
+    // Migrate old Gemini-only key if present
+    if (!localStorage.getItem('ai_api_key') && localStorage.getItem('gemini_api_key')) {
+      localStorage.setItem('ai_api_key', localStorage.getItem('gemini_api_key'));
+      localStorage.setItem('ai_provider', 'gemini');
+    }
+
+    const MATERIALS = {
+      clay:   { color: 0xd6d3d1, metalness: 0.05, roughness: 0.85, flatShading: true },
+      white:  { color: 0xf1f5f9, metalness: 0.1,  roughness: 0.45, flatShading: true },
+      black:  { color: 0x1e293b, metalness: 0.3,  roughness: 0.4,  flatShading: true },
+      cyan:   { color: 0x22d3ee, metalness: 0.2,  roughness: 0.35, flatShading: true },
+      purple: { color: 0xa78bfa, metalness: 0.25, roughness: 0.4,  flatShading: true }
+    };
+
+    // ---------- DOM ----------
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileInfo = document.getElementById('file-info');
+    const fileNameEl = document.getElementById('file-name');
+    const fileSizeEl = document.getElementById('file-size');
+    const progressPanel = document.getElementById('progress-panel');
+    const progressLabel = document.getElementById('progress-label');
+    const progressPct = document.getElementById('progress-pct');
+    const progressBar = document.getElementById('progress-bar');
+    const successBanner = document.getElementById('success-banner');
+    const successDetail = document.getElementById('success-detail');
+    const analysisPanel = document.getElementById('analysis-panel');
+    const statsGrid = document.getElementById('stats-grid');
+    const issuesList = document.getElementById('issues-list');
+    const viewerEmpty = document.getElementById('viewer-empty');
+    
+    // Tools UI setup
+    const exportFormatSelect = document.getElementById('export-format');
+    const btnDownload = document.getElementById('btn-download');
+    
+    const viewerStats = document.getElementById('viewer-stats');
+    const materialSwatches = document.getElementById('material-swatches');
+    const swatchOriginal = document.getElementById('swatch-original');
+    const viewerToolbar = document.getElementById('viewer-toolbar');
+    const transformToolbar = document.getElementById('transform-toolbar');
+    const overlayFaces = document.getElementById('overlay-faces');
+    const overlayVerts = document.getElementById('overlay-verts');
+    const overlayPrint = document.getElementById('overlay-print');
+    const overlayPrintIcon = document.getElementById('overlay-print-icon');
+    const printabilityCard = document.getElementById('printability-card');
+    const printIcon = document.getElementById('print-icon');
+    const printTitle = document.getElementById('print-title');
+    const printDesc = document.getElementById('print-desc');
+    const msgBox = document.getElementById('message-box');
+    const msgText = document.getElementById('message-box-text');
+
+    // AI Provider UI setup
+    const btnApiSettings = document.getElementById('btn-api-settings');
+    const apiKeyModal = document.getElementById('api-key-modal');
+    const apiKeyInput = document.getElementById('api-key-input');
+    const btnApiCancel = document.getElementById('btn-api-cancel');
+    const btnApiSave = document.getElementById('btn-api-save');
+    const aiProviderSelect = document.getElementById('ai-provider-select');
+    const customFields = document.getElementById('custom-fields');
+    const aiBaseUrlInput = document.getElementById('ai-base-url');
+    const aiModelNameInput = document.getElementById('ai-model-name');
+    const aiModelOverride = document.getElementById('ai-model-override');
+
+    function updateProviderUI() {
+      const isCustom = aiProviderSelect.value === 'custom';
+      customFields.classList.toggle('hidden', !isCustom);
+      document.getElementById('model-preset').classList.toggle('hidden', isCustom);
+    }
+
+    aiProviderSelect.addEventListener('change', updateProviderUI);
+
+    btnApiSettings.addEventListener('click', () => {
+      aiProviderSelect.value = aiProvider;
+      apiKeyInput.value = aiApiKey;
+      aiBaseUrlInput.value = aiBaseUrl;
+      aiModelNameInput.value = aiModel;
+      aiModelOverride.value = aiModel;
+      updateProviderUI();
+      apiKeyModal.classList.remove('hidden');
+    });
+    
+    btnApiCancel.addEventListener('click', () => {
+      apiKeyModal.classList.add('hidden');
+    });
+    
+    btnApiSave.addEventListener('click', () => {
+      aiProvider = aiProviderSelect.value;
+      aiApiKey = apiKeyInput.value.trim();
+      aiBaseUrl = aiBaseUrlInput.value.trim();
+      // Prefer custom model name if custom, else override
+      aiModel = (aiProvider === 'custom' ? aiModelNameInput.value.trim() : aiModelOverride.value.trim()) || '';
+
+      localStorage.setItem('ai_provider', aiProvider);
+      if (aiApiKey) {
+        localStorage.setItem('ai_api_key', aiApiKey);
+      } else {
+        localStorage.removeItem('ai_api_key');
+      }
+      if (aiBaseUrl) localStorage.setItem('ai_base_url', aiBaseUrl);
+      else localStorage.removeItem('ai_base_url');
+      if (aiModel) localStorage.setItem('ai_model', aiModel);
+      else localStorage.removeItem('ai_model');
+
+      // Clean up old Gemini-only key
+      localStorage.removeItem('gemini_api_key');
+
+      showSuccess(aiApiKey ? `AI settings saved (${aiProvider}).` : 'AI settings cleared.');
+      apiKeyModal.classList.add('hidden');
+    });
+
+    function toggleTools(enable) {
+      const toolIds = [
+        'btn-ai-autofix', 'btn-analyze', 'btn-weld', 'btn-clean', 'btn-normals', 'btn-auto', 
+        'export-format', 'btn-download'
+      ];
+      toolIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !enable;
+      });
+    }
+
+    function showMessage(msg) {
+        msgText.textContent = msg;
+        msgBox.classList.remove('hidden');
+    }
+
+    // ---------- Three.js setup ----------
+    function initViewer() {
+      const container = document.getElementById('viewer-container');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f172a);
+
+      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.01, 5000);
+      camera.up.set(0, 0, 1);
+      camera.position.set(80, 100, 60);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      container.appendChild(renderer.domElement);
+
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+
+      // Transform Controls Setup
+      transformControl = new TransformControls(camera, renderer.domElement);
+      transformControl.addEventListener('dragging-changed', (event) => {
+        controls.enabled = !event.value; // Disable camera orbit while dragging transforms
+      });
+      scene.add(transformControl.getHelper());
+
+      const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+      scene.add(ambient);
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.9);
+      key.position.set(60, 50, 90);
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0xa5f3fc, 0.35);
+      fill.position.set(-50, -40, 30);
+      scene.add(fill);
+
+      const rim = new THREE.DirectionalLight(0xfce7f3, 0.25);
+      rim.position.set(20, -60, -30);
+      scene.add(rim);
+
+      const grid = new THREE.GridHelper(200, 20, 0x1e293b, 0x1e293b);
+      grid.material.opacity = 0.35;
+      grid.material.transparent = true;
+      grid.rotation.x = Math.PI / 2;
+      scene.add(grid);
+
+      window.addEventListener('resize', onResize);
+      animate();
+    }
+
+    function onResize() {
+      const container = document.getElementById('viewer-container');
+      if (!container) return;
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    function fitCameraToMesh(mesh) {
+      // Bake any active transforms before calculating bounding box to ensure it fits accurately
+      if (transformControl.object) mesh.updateMatrixWorld();
+      
+      const box = new THREE.Box3().setFromObject(mesh);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const fov = camera.fov * (Math.PI / 180);
+      let cameraDist = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.55;
+      
+      camera.position.set(center.x + cameraDist * 0.55, center.y - cameraDist * 0.55, center.z + cameraDist * 0.4);
+      controls.target.copy(center);
+      controls.update();
+      camera.near = maxDim / 100;
+      camera.far = maxDim * 25;
+      camera.updateProjectionMatrix();
+    }
+
+    function applyMaterial(key) {
+      currentMaterialKey = key;
+      if (!currentMesh) return;
+      
+      const useOriginal = (key === 'original' && originalHasColors);
+      const preset = MATERIALS[key] || MATERIALS.clay;
+      
+      currentMesh.material.color.setHex(useOriginal ? 0xffffff : preset.color);
+      currentMesh.material.vertexColors = useOriginal && currentGeometry.hasAttribute('color');
+      currentMesh.material.map = useOriginal ? currentGeometry.userData.map : null;
+      currentMesh.material.metalness = useOriginal ? 0.1 : preset.metalness;
+      currentMesh.material.roughness = useOriginal ? 0.8 : preset.roughness;
+      currentMesh.material.flatShading = useOriginal ? false : preset.flatShading;
+      currentMesh.material.wireframe = wireframeMode;
+      currentMesh.material.needsUpdate = true;
+
+      document.querySelectorAll('.material-swatch').forEach(el => {
+        el.classList.toggle('active', el.dataset.mat === key);
+      });
+    }
+
+    function setMesh(geometry) {
+      if (currentMesh) {
+        transformControl.detach();
+        scene.remove(currentMesh);
+        currentMesh.geometry.dispose();
+        currentMesh.material.dispose();
+        currentMesh = null;
+      }
+      currentGeometry = geometry;
+
+      originalHasColors = geometry.hasAttribute('color') || geometry.hasAttribute('uv') || !!geometry.userData.map;
+      if (originalHasColors) {
+        swatchOriginal.classList.remove('hidden');
+        if (currentMaterialKey === 'clay') currentMaterialKey = 'original'; 
+      } else {
+        swatchOriginal.classList.add('hidden');
+        if (currentMaterialKey === 'original') currentMaterialKey = 'clay';
+      }
+
+      const useOriginal = (currentMaterialKey === 'original' && originalHasColors);
+      const preset = MATERIALS[currentMaterialKey] || MATERIALS.clay;
+      
+      const mat = new THREE.MeshStandardMaterial({
+        color: useOriginal ? 0xffffff : preset.color,
+        vertexColors: useOriginal && geometry.hasAttribute('color'),
+        map: useOriginal ? geometry.userData.map : null,
+        metalness: useOriginal ? 0.1 : preset.metalness,
+        roughness: useOriginal ? 0.8 : preset.roughness,
+        side: THREE.DoubleSide,
+        flatShading: useOriginal ? false : preset.flatShading
+      });
+      
+      currentMesh = new THREE.Mesh(geometry, mat);
+      scene.add(currentMesh);
+
+      viewerEmpty.classList.add('hidden');
+      viewerStats.classList.remove('hidden');
+      materialSwatches.classList.remove('hidden');
+      viewerToolbar.classList.remove('hidden');
+      transformToolbar.classList.remove('hidden');
+
+      // Reset transform tool buttons
+      document.querySelectorAll('.transform-btn').forEach(btn => btn.classList.remove('active'));
+
+      fitCameraToMesh(currentMesh);
+      document.getElementById('ai-response-container').innerHTML = '';
+      document.getElementById('ai-response-container').classList.add('hidden');
+    }
+
+    // ---------- Transform Baking ----------
+    // This is crucial. When a user scales or rotates, we must physically alter the geometry points
+    // BEFORE running analysis, hole-filling, or downloading, so the orientation is permanently saved!
+    function bakeTransformsToGeometry() {
+      if (!currentMesh) return;
+      currentMesh.updateMatrixWorld();
+      currentMesh.geometry.applyMatrix4(currentMesh.matrixWorld);
+      
+      // Reset mesh transforms to identity since they are now deeply encoded in the geometry
+      currentMesh.position.set(0, 0, 0);
+      currentMesh.rotation.set(0, 0, 0);
+      currentMesh.scale.set(1, 1, 1);
+      currentMesh.updateMatrixWorld();
+      
+      // Keep transform gizmo perfectly attached without moving the object visibly
+      if (transformControl.object) {
+        transformControl.detach();
+        transformControl.attach(currentMesh);
+      }
+    }
+
+    // Transform Tools UI Handling
+    document.querySelectorAll('.transform-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!currentMesh) return;
+        const mode = btn.dataset.mode;
+        const isActive = btn.classList.contains('active');
+
+        // Turn all buttons off
+        document.querySelectorAll('.transform-btn').forEach(b => b.classList.remove('active'));
+
+        if (isActive) {
+          // If clicked the active tool again, turn it off
+          transformControl.detach();
+        } else {
+          // Turn on the selected tool
+          btn.classList.add('active');
+          transformControl.setMode(mode);
+          transformControl.attach(currentMesh);
+        }
+      });
+    });
+
+    // ---------- Progress helpers ----------
+    function showProgress(label, pct) {
+      successBanner.classList.add('hidden');
+      progressPanel.classList.remove('hidden');
+      progressLabel.textContent = label;
+      progressPct.textContent = Math.round(pct) + '%';
+      progressBar.style.width = pct + '%';
+    }
+
+    function hideProgress() {
+      progressPanel.classList.add('hidden');
+    }
+
+    function showSuccess(detail = 'Mesh cleaned and ready for download.') {
+      hideProgress();
+      successDetail.textContent = detail;
+      successBanner.classList.remove('hidden');
+      setTimeout(() => successBanner.classList.add('hidden'), 6000);
+    }
+
+    // ---------- Universal File Loading ----------
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('active'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('active');
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) handleFile(fileInput.files[0]);
+    });
+
+    document.getElementById('btn-clear').addEventListener('click', clearAll);
+
+    function clearAll() {
+      if (currentMesh) {
+        transformControl.detach();
+        scene.remove(currentMesh);
+        currentMesh.geometry.dispose();
+        currentMesh.material.dispose();
+        currentMesh = null;
+      }
+      currentGeometry = null;
+      lastAnalysis = null;
+      fileInfo.classList.add('hidden');
+      analysisPanel.classList.add('hidden');
+      successBanner.classList.add('hidden');
+      viewerEmpty.classList.remove('hidden');
+      viewerStats.classList.add('hidden');
+      materialSwatches.classList.add('hidden');
+      viewerToolbar.classList.add('hidden');
+      transformToolbar.classList.add('hidden');
+      msgBox.classList.add('hidden');
+      document.getElementById('ai-response-container').innerHTML = '';
+      document.getElementById('ai-response-container').classList.add('hidden');
+      toggleTools(false);
+      fileInput.value = '';
+      originalFileName = 'model';
+    }
+
+    async function handleFile(file) {
+      const name = file.name.toLowerCase();
+      const ext = name.split('.').pop();
+      const allowed = ['stl', 'obj', 'ply', 'gltf', 'glb', '3mf'];
+      
+      if (!allowed.includes(ext)) {
+        showMessage('Unsupported file format. Please upload STL, OBJ, PLY, GLTF, or 3MF.');
+        return;
+      }
+      
+      originalFileName = file.name.replace(new RegExp(`\\.${ext}$`, 'i'), '');
+      fileNameEl.textContent = file.name;
+      fileSizeEl.textContent = formatBytes(file.size);
+      fileInfo.classList.remove('hidden');
+      analysisPanel.classList.add('hidden');
+      successBanner.classList.add('hidden');
+      msgBox.classList.add('hidden');
+
+      showProgress('Reading file…', 10);
+      try {
+        const buffer = await file.arrayBuffer();
+        showProgress('Parsing geometry…', 35);
+
+        let geometry = await parseFileBuffer(buffer, ext);
+
+        if (!geometry || !geometry.attributes.position) throw new Error('Invalid geometry after parsing');
+        
+        geometry.computeVertexNormals();
+        geometry.computeBoundingBox();
+        geometry.computeBoundingSphere();
+
+        showProgress('Building preview…', 70);
+        setMesh(geometry);
+        showProgress('Analyzing topology…', 90);
+        
+        await new Promise(r => setTimeout(r, 50));
+        runAnalysis(geometry);
+        
+        toggleTools(true);
+        hideProgress();
+      } catch (err) {
+        console.error(err);
+        hideProgress();
+        showMessage('Failed to load file: ' + (err.message || err));
+        clearAll();
+      }
+    }
+
+    async function parseFileBuffer(buffer, ext) {
+      if (ext === 'stl') {
+        return new STLLoader().parse(buffer);
+      } 
+      else if (ext === 'ply') {
+        return new PLYLoader().parse(buffer);
+      }
+      else if (ext === 'obj') {
+        const text = new TextDecoder().decode(buffer);
+        const obj = new OBJLoader().parse(text);
+        return extractGeometry(obj);
+      }
+      else if (ext === 'glb' || ext === 'gltf') {
+        const loader = new GLTFLoader();
+        return new Promise((resolve, reject) => {
+          loader.parse(buffer, '', (gltf) => {
+            try { resolve(extractGeometry(gltf.scene)); } 
+            catch(e) { reject(e); }
+          }, reject);
+        });
+      }
+      else if (ext === '3mf') {
+        const loader = new ThreeMFLoader();
+        return new Promise((resolve, reject) => {
+          try {
+            const object = loader.parse(buffer);
+            resolve(extractGeometry(object));
+          } catch(e) { reject(e); }
+        });
+      }
+      throw new Error("Format parser not implemented");
+    }
+
+    function extractGeometry(object) {
+      const geos = [];
+      object.updateMatrixWorld(true);
+      object.traverse(c => { 
+        if (c.isMesh) {
+          const geo = c.geometry.clone();
+          geo.applyMatrix4(c.matrixWorld); 
+          
+          if (!geo.hasAttribute('color') && c.material) {
+            let col = new THREE.Color(1, 1, 1);
+            if (c.material.color) col.copy(c.material.color);
+            const colors = new Float32Array(geo.attributes.position.count * 3);
+            for(let i = 0; i < geo.attributes.position.count; i++) {
+              colors[i*3] = col.r;
+              colors[i*3+1] = col.g;
+              colors[i*3+2] = col.b;
+            }
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+          }
+          
+          if (c.material && c.material.map) geo.userData.map = c.material.map;
+          geos.push(geo); 
+        } 
+      });
+      if (geos.length === 0) throw new Error('No mesh found in file');
+      if (geos.length === 1) return geos[0];
+      
+      let totalVertices = 0;
+      let hasColor = false;
+      let hasUv = false;
+      let firstMap = null;
+      
+      for (const g of geos) {
+        totalVertices += g.attributes.position.count;
+        if (g.hasAttribute('color')) hasColor = true;
+        if (g.hasAttribute('uv')) hasUv = true;
+        if (!firstMap && g.userData.map) firstMap = g.userData.map;
+      }
+      
+      const positions = new Float32Array(totalVertices * 3);
+      const colors = hasColor ? new Float32Array(totalVertices * 3) : null;
+      const uvs = hasUv ? new Float32Array(totalVertices * 2) : null;
+      let offset = 0;
+
+      for (const g of geos) {
+        const posCount = g.attributes.position.count;
+        const pos = g.attributes.position.array;
+        positions.set(pos, offset * 3);
+        
+        if (hasColor) {
+          if (g.hasAttribute('color')) {
+            colors.set(g.attributes.color.array, offset * 3);
+          } else {
+            const col = new Float32Array(posCount * 3).fill(1);
+            colors.set(col, offset * 3);
+          }
+        }
+        
+        if (hasUv) {
+          if (g.hasAttribute('uv')) {
+            uvs.set(g.attributes.uv.array, offset * 2);
+          } else {
+            const emptyUv = new Float32Array(posCount * 2).fill(0);
+            uvs.set(emptyUv, offset * 2);
+          }
+        }
+        offset += posCount;
+      }
+      
+      const merged = new THREE.BufferGeometry();
+      merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      if (hasColor) merged.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      if (hasUv) merged.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      if (firstMap) merged.userData.map = firstMap;
+      
+      merged.computeVertexNormals();
+      return merged;
+    }
+
+    // ---------- Topology Analysis ----------
+    function runAnalysis(geometry) {
+      // Bake user's custom scale/rotation transformations into the mesh before analyzing it!
+      bakeTransformsToGeometry();
+      const analysis = analyzeMesh(geometry);
+      lastAnalysis = analysis;
+      renderAnalysis(analysis);
+      updatePrintability(analysis);
+      analysisPanel.classList.remove('hidden');
+    }
+
+    function analyzeMesh(geometry) {
+      let positions = geometry.attributes.position.array;
+      let index = geometry.index ? geometry.index.array : null;
+      const faceCount = index ? index.length / 3 : positions.length / 9;
+      const vertexCount = positions.length / 3;
+
+      const vertMap = new Map();
+      const uniqueVerts = [];
+      const remap = new Int32Array(vertexCount);
+      let uniqueCount = 0;
+
+      for (let i = 0; i < vertexCount; i++) {
+        const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+        const key = `${x.toFixed(6)},${y.toFixed(6)},${z.toFixed(6)}`;
+        if (vertMap.has(key)) {
+          remap[i] = vertMap.get(key);
+        } else {
+          vertMap.set(key, uniqueCount);
+          remap[i] = uniqueCount;
+          uniqueVerts.push(x, y, z);
+          uniqueCount++;
+        }
+      }
+
+      const edgeCount = new Map();
+      let degenerateCount = 0;
+
+      function addEdge(a, b) {
+        const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+        edgeCount.set(key, (edgeCount.get(key) || 0) + 1);
+      }
+
+      for (let f = 0; f < faceCount; f++) {
+        let i0, i1, i2;
+        if (index) {
+          i0 = remap[index[f * 3]];
+          i1 = remap[index[f * 3 + 1]];
+          i2 = remap[index[f * 3 + 2]];
+        } else {
+          i0 = remap[f * 3];
+          i1 = remap[f * 3 + 1];
+          i2 = remap[f * 3 + 2];
+        }
+
+        const ax = uniqueVerts[i0 * 3], ay = uniqueVerts[i0 * 3 + 1], az = uniqueVerts[i0 * 3 + 2];
+        const bx = uniqueVerts[i1 * 3], by = uniqueVerts[i1 * 3 + 1], bz = uniqueVerts[i1 * 3 + 2];
+        const cx = uniqueVerts[i2 * 3], cy = uniqueVerts[i2 * 3 + 1], cz = uniqueVerts[i2 * 3 + 2];
+        const abx = bx - ax, aby = by - ay, abz = bz - az;
+        const acx = cx - ax, acy = cy - ay, acz = cz - az;
+        const nx = aby * acz - abz * acy;
+        const ny = abz * acx - abx * acz;
+        const nz = abx * acy - aby * acx;
+        const area2 = nx * nx + ny * ny + nz * nz;
+        if (area2 < 1e-20) {
+          degenerateCount++;
+          continue;
+        }
+        addEdge(i0, i1);
+        addEdge(i1, i2);
+        addEdge(i2, i0);
+      }
+
+      let nonManifoldEdges = 0;
+      let boundaryEdgeCount = 0;
+      for (const [, count] of edgeCount) {
+        if (count === 1) boundaryEdgeCount++;
+        else if (count > 2) nonManifoldEdges++;
+      }
+
+      const box = geometry.boundingBox || new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+
+      return {
+        vertexCount,
+        uniqueVertexCount: uniqueCount,
+        faceCount: Math.floor(faceCount),
+        degenerateCount,
+        nonManifoldEdges,
+        boundaryEdgeCount,
+        isManifold: nonManifoldEdges === 0 && boundaryEdgeCount === 0,
+        isWatertight: boundaryEdgeCount === 0,
+        boundingBox: size,
+        hasDuplicates: uniqueCount < vertexCount * 0.98
+      };
+    }
+
+    function renderAnalysis(a) {
+      statsGrid.innerHTML = `
+        <div class="stat-card bg-slate-900 border border-slate-800 rounded-lg p-3">
+          <p class="text-xs text-slate-500">Vertices</p>
+          <p class="text-lg font-semibold">${a.vertexCount.toLocaleString()}</p>
+          ${a.uniqueVertexCount < a.vertexCount ? `<p class="text-xs text-amber-400">${a.uniqueVertexCount.toLocaleString()} unique</p>` : ''}
+        </div>
+        <div class="stat-card bg-slate-900 border border-slate-800 rounded-lg p-3">
+          <p class="text-xs text-slate-500">Faces</p>
+          <p class="text-lg font-semibold">${a.faceCount.toLocaleString()}</p>
+        </div>
+        <div class="stat-card bg-slate-900 border border-slate-800 rounded-lg p-3">
+          <p class="text-xs text-slate-500">Size (mm)</p>
+          <p class="text-sm font-medium">${a.boundingBox.x.toFixed(1)} × ${a.boundingBox.y.toFixed(1)} × ${a.boundingBox.z.toFixed(1)}</p>
+        </div>
+        <div class="stat-card bg-slate-900 border border-slate-800 rounded-lg p-3">
+          <p class="text-xs text-slate-500">Status</p>
+          <p class="text-sm font-semibold ${a.isManifold ? 'text-emerald-400' : 'text-amber-400'}">${a.isManifold ? 'Manifold ✓' : 'Needs repair'}</p>
+        </div>
+      `;
+
+      const issues = [];
+      if (a.nonManifoldEdges > 0) {
+        issues.push(`<div class="flex items-center gap-2"><span class="issue-bad">●</span> ${a.nonManifoldEdges} non-manifold edge(s)</div>`);
+      }
+      if (a.boundaryEdgeCount > 0) {
+        issues.push(`<div class="flex items-center gap-2"><span class="issue-warn">●</span> ${a.boundaryEdgeCount} open boundary edge(s)</div>`);
+      }
+      if (a.degenerateCount > 0) {
+        issues.push(`<div class="flex items-center gap-2"><span class="issue-warn">●</span> ${a.degenerateCount} degenerate face(s)</div>`);
+      }
+      if (a.hasDuplicates) {
+        issues.push(`<div class="flex items-center gap-2"><span class="issue-warn">●</span> Duplicate / near-duplicate vertices</div>`);
+      }
+      if (issues.length === 0) {
+        issues.push(`<div class="flex items-center gap-2"><span class="issue-ok">●</span> Mesh looks clean and print-ready</div>`);
+      }
+      issuesList.innerHTML = issues.join('');
+
+      overlayFaces.textContent = a.faceCount.toLocaleString();
+      overlayVerts.textContent = a.vertexCount.toLocaleString();
+    }
+
+    function updatePrintability(a) {
+      const isGood = a.isManifold && a.degenerateCount === 0;
+      const isOk = a.nonManifoldEdges === 0 && a.degenerateCount < 20;
+
+      if (isGood) {
+        printabilityCard.className = 'rounded-xl p-4 border flex items-center gap-3 bg-emerald-500/10 border-emerald-500/40';
+        printIcon.innerHTML = `<div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center"><svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></div>`;
+        printTitle.textContent = 'Printable';
+        printTitle.className = 'text-sm font-semibold text-emerald-300';
+        printDesc.textContent = 'Mesh is manifold and clean. Ready for most slicers.';
+        printDesc.className = 'text-xs mt-0.5 text-emerald-400/80';
+
+        overlayPrintIcon.innerHTML = `<span class="text-emerald-400 font-semibold flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Ready</span>`;
+        overlayPrint.className = 'bg-black/70 backdrop-blur-md border border-emerald-500/30 rounded-xl px-3.5 py-2.5 text-xs flex items-center gap-2';
+      } else if (isOk) {
+        printabilityCard.className = 'rounded-xl p-4 border flex items-center gap-3 bg-amber-500/10 border-amber-500/40';
+        printIcon.innerHTML = `<div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center"><svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>`;
+        printTitle.textContent = 'Review recommended';
+        printTitle.className = 'text-sm font-semibold text-amber-300';
+        printDesc.textContent = 'Some open edges or minor issues remain. Many slicers can still handle it.';
+        printDesc.className = 'text-xs mt-0.5 text-amber-400/80';
+
+        overlayPrintIcon.innerHTML = `<span class="text-amber-400 font-semibold flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> Review</span>`;
+        overlayPrint.className = 'bg-black/70 backdrop-blur-md border border-amber-500/30 rounded-xl px-3.5 py-2.5 text-xs flex items-center gap-2';
+      } else {
+        printabilityCard.className = 'rounded-xl p-4 border flex items-center gap-3 bg-red-500/10 border-red-500/40';
+        printIcon.innerHTML = `<div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center"><svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></div>`;
+        printTitle.textContent = 'Needs repair';
+        printTitle.className = 'text-sm font-semibold text-red-300';
+        printDesc.textContent = 'Non-manifold geometry detected. Run Auto Repair before slicing.';
+        printDesc.className = 'text-xs mt-0.5 text-red-400/80';
+
+        overlayPrintIcon.innerHTML = `<span class="text-red-400 font-semibold flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> Issues</span>`;
+        overlayPrint.className = 'bg-black/70 backdrop-blur-md border border-red-500/30 rounded-xl px-3.5 py-2.5 text-xs flex items-center gap-2';
+      }
+    }
+
+    // ---------- Universal AI Integration (Gemini / OpenAI / xAI / Claude / Custom) ----------
+    async function fetchAIWithRetry(prompt, base64Image = null, retries = 5) {
+      const delays = [1000, 2000, 4000, 8000, 16000];
+      
+      if (!aiApiKey) {
+        throw new Error("No API key configured. Please click 'AI Settings' in the header to set your provider and key.");
+      }
+
+      const provider = aiProvider || 'gemini';
+      let model = aiModel;
+
+      // Defaults per provider
+      if (!model) {
+        if (provider === 'gemini') model = 'gemini-2.0-flash';
+        else if (provider === 'openai') model = 'gpt-4o-mini';
+        else if (provider === 'xai') model = 'grok-2-latest';
+        else if (provider === 'anthropic') model = 'claude-3-5-sonnet-20241022';
+        else model = 'gpt-4o-mini';
+      }
+
+      for (let i = 0; i < retries; i++) {
+        try {
+          let response, data, text = '';
+
+          if (provider === 'gemini') {
+            // Google Gemini
+            const parts = [{ text: prompt }];
+            if (base64Image) {
+              parts.push({ inlineData: { mimeType: "image/png", data: base64Image.split(',')[1] } });
+            }
+            const payload = { contents: [{ role: "user", parts }] };
+            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${aiApiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+              let errMessage = `Gemini API Error: ${response.status}`;
+              try { const errData = await response.json(); if (errData.error?.message) errMessage += ` - ${errData.error.message}`; } catch(e) {}
+              throw new Error(errMessage);
+            }
+            data = await response.json();
+            text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          }
+          else if (provider === 'anthropic') {
+            // Anthropic Claude
+            const content = [{ type: 'text', text: prompt }];
+            if (base64Image) {
+              content.unshift({
+                type: 'image',
+                source: { type: 'base64', media_type: 'image/png', data: base64Image.split(',')[1] }
+              });
+            }
+            const payload = {
+              model: model,
+              max_tokens: 4096,
+              messages: [{ role: 'user', content }]
+            };
+            response = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': aiApiKey,
+                'anthropic-version': '2023-06-01'
+              },
+              body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+              let errMessage = `Claude API Error: ${response.status}`;
+              try { const errData = await response.json(); if (errData.error?.message) errMessage += ` - ${errData.error.message}`; } catch(e) {}
+              throw new Error(errMessage);
+            }
+            data = await response.json();
+            text = data.content?.[0]?.text || '';
+          }
+          else {
+            // OpenAI, xAI Grok, or any OpenAI-compatible endpoint
+            let url;
+            if (provider === 'openai') url = 'https://api.openai.com/v1/chat/completions';
+            else if (provider === 'xai') url = 'https://api.x.ai/v1/chat/completions';
+            else url = (aiBaseUrl || 'https://api.openai.com/v1').replace(/\/$/, '') + '/chat/completions';
+
+            const content = [{ type: 'text', text: prompt }];
+            if (base64Image) {
+              content.push({
+                type: 'image_url',
+                image_url: { url: base64Image }
+              });
+            }
+            const payload = {
+              model: model,
+              messages: [{ role: 'user', content }],
+              max_tokens: 4096,
+              temperature: 0.4
+            };
+            response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${aiApiKey}`
+              },
+              body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+              let errMessage = `${provider.toUpperCase()} API Error: ${response.status}`;
+              try { const errData = await response.json(); if (errData.error?.message) errMessage += ` - ${errData.error.message}`; } catch(e) {}
+              throw new Error(errMessage);
+            }
+            data = await response.json();
+            text = data.choices?.[0]?.message?.content || '';
+          }
+
+          return text || '{}';
+        } catch (error) {
+          if (i === retries - 1) throw error;
+          await new Promise(r => setTimeout(r, delays[i]));
+        }
+      }
+    }
+
+    // AI Smart Fix Feature
+    document.getElementById('btn-ai-autofix').addEventListener('click', async () => {
+        if (!currentGeometry || !lastAnalysis) return;
+        
+        bakeTransformsToGeometry();
+
+        const btn = document.getElementById('btn-ai-autofix');
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> AI Optimizing Repair...`;
+        
+        showProgress('AI is analyzing mesh topology...', 10);
+        
+        try {
+            const prompt = `You are a 3D geometry repair agent. Analyze these mesh statistics:
+- Vertices: ${lastAnalysis.vertexCount}
+- Faces: ${lastAnalysis.faceCount}
+- Non-Manifold Edges: ${lastAnalysis.nonManifoldEdges}
+- Open Boundaries (Holes): ${lastAnalysis.boundaryEdgeCount}
+- Degenerate Faces: ${lastAnalysis.degenerateCount}
+- Bounding Box Size: ${lastAnalysis.boundingBox.x.toFixed(1)} x ${lastAnalysis.boundingBox.y.toFixed(1)} x ${lastAnalysis.boundingBox.z.toFixed(1)} mm
+
+Design a custom mathematical repair plan to fix the manifold. 
+Available operations: "weld" (merges nearby vertices), "clean" (removes zero-area degenerate faces), "fill" (closes boundary loops and holes), "normals" (recalculates normals).
+Reply ONLY with a raw JSON object in this exact format, no markdown tags or backticks:
+{
+  "weldTolerance": 0.001,
+  "sequence": ["weld", "fill", "clean", "normals"],
+  "reasoning": "Short explanation of why this specific tolerance and sequence was chosen."
+}`;
+
+            const responseText = await fetchAIWithRetry(prompt);
+            
+            // Clean any potential markdown wrapper the AI might add
+            const cleanedText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const strategy = JSON.parse(cleanedText);
+            
+            showProgress('AI Plan: ' + (strategy.reasoning || 'Applying algorithmic fixes...'), 20);
+            await new Promise(r => setTimeout(r, 1800)); // Briefly pause so user can read reasoning
+            
+            let g = currentGeometry.clone();
+            let step = 1;
+            const totalSteps = strategy.sequence.length;
+            
+            for (const op of strategy.sequence) {
+               showProgress(`AI Executing: ${op.toUpperCase()}...`, 20 + (step / totalSteps) * 75);
+               await new Promise(r => setTimeout(r, 50)); 
+               
+               if (op === 'weld') g = weldVertices(g, strategy.weldTolerance || 1e-5);
+               else if (op === 'clean') g = removeDegenerates(g);
+               else if (op === 'fill') g = fillAdvancedHoles(g);
+               else if (op === 'normals') g = fixNormals(g);
+               
+               step++;
+            }
+            
+            setMesh(g);
+            runAnalysis(g);
+            showSuccess('AI Smart Repair finished successfully!');
+        } catch(e) {
+            console.error(e);
+            showMessage(e.message.includes('API') || e.message.includes('key configured') ? e.message : "AI Smart Fix failed to generate or execute the strategy. Your mesh might be too complex, or the API limit was reached.");
+            hideProgress();
+        } finally {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    });
+
+    // Slicer Advice (Original implementation, kept as requested)
+    document.getElementById('btn-ai-review').addEventListener('click', async () => {
+        if (!currentMesh || !lastAnalysis) {
+            showMessage("Please load and analyze a model first.");
+            return;
+        }
+
+        const btn = document.getElementById('btn-ai-review');
+        const responseContainer = document.getElementById('ai-response-container');
+        
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Analyzing...`;
+
+        try {
+            renderer.render(scene, camera);
+            const dataUrl = renderer.domElement.toDataURL('image/png');
+            
+            const prompt = `You are a 3D printing and CAD expert. I am trying to fix a 3D model named "${originalFileName}".
+            Here are its geometrical statistics:
+            - Bounding Box: ${lastAnalysis.boundingBox.x.toFixed(1)} x ${lastAnalysis.boundingBox.y.toFixed(1)} x ${lastAnalysis.boundingBox.z.toFixed(1)} mm
+            - Faces: ${lastAnalysis.faceCount}
+            - Vertices: ${lastAnalysis.vertexCount}
+            - Non-Manifold Edges: ${lastAnalysis.nonManifoldEdges}
+            - Boundary/Open Edges (Holes): ${lastAnalysis.boundaryEdgeCount}
+            - Degenerate Faces: ${lastAnalysis.degenerateCount}
+
+            The automatic, simple script-based repair failed to make this mesh completely manifold and print-ready. Based on the provided screenshot and the exact stats above, please suggest:
+            1. An assessment of why it's likely failing (e.g., complex intersections, specific topology issues).
+            2. Specific steps I should use in a professional software like Blender (e.g., Remesh modifier, Merge by distance) or MeshLab (e.g., Screened Poisson Surface Reconstruction) to fix this.
+            3. Alternative slicer settings that might force it to print anyway (like "Exclusive" slicing tolerance in Cura, or PrusaSlicer's "Fix through Netfabb" feature).
+            
+            Format your response cleanly in Markdown (using bolding and lists). Keep it direct and expert-level.`;
+
+            const textResponse = await fetchAIWithRetry(prompt, dataUrl);
+            
+            responseContainer.innerHTML = marked.parse(textResponse);
+            responseContainer.classList.remove('hidden');
+            btn.innerHTML = `✨ Get New AI Advice`;
+        } catch (e) {
+            console.error(e);
+            showMessage(e.message.includes('API') || e.message.includes('key configured') ? e.message : "AI analysis failed. Please verify API key or network connection.");
+            btn.innerHTML = `Analyze & Get Fix Suggestions`;
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    // ---------- Repair operations ----------
+    function weldVertices(geometry, tolerance = 1e-5) {
+      bakeTransformsToGeometry();
+      const pos = geometry.attributes.position.array;
+      const hasColor = geometry.hasAttribute('color');
+      const col = hasColor ? geometry.attributes.color.array : null;
+      const hasUv = geometry.hasAttribute('uv');
+      const uvArr = hasUv ? geometry.attributes.uv.array : null;
+
+      const vertexCount = pos.length / 3;
+      const map = new Map();
+      const newPos = [];
+      const newCol = hasColor ? [] : null;
+      const newUv = hasUv ? [] : null;
+      const remap = new Int32Array(vertexCount);
+      let newCount = 0;
+      const quant = 1 / tolerance;
+
+      for (let i = 0; i < vertexCount; i++) {
+        const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+        const key = `${Math.round(x * quant)},${Math.round(y * quant)},${Math.round(z * quant)}`;
+        if (map.has(key)) {
+          remap[i] = map.get(key);
+        } else {
+          map.set(key, newCount);
+          remap[i] = newCount;
+          newPos.push(x, y, z);
+          if (hasColor) newCol.push(col[i*3], col[i*3+1], col[i*3+2]);
+          if (hasUv) newUv.push(uvArr[i*2], uvArr[i*2+1]);
+          newCount++;
+        }
+      }
+
+      let index = geometry.index ? Array.from(geometry.index.array) : null;
+      const faces = [];
+      if (index) {
+        for (let i = 0; i < index.length; i += 3) {
+          const a = remap[index[i]], b = remap[index[i + 1]], c = remap[index[i + 2]];
+          if (a !== b && b !== c && c !== a) faces.push(a, b, c);
+        }
+      } else {
+        for (let i = 0; i < vertexCount; i += 3) {
+          const a = remap[i], b = remap[i + 1], c = remap[i + 2];
+          if (a !== b && b !== c && c !== a) faces.push(a, b, c);
+        }
+      }
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(newPos, 3));
+      if (hasColor) geo.setAttribute('color', new THREE.Float32BufferAttribute(newCol, 3));
+      if (hasUv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(newUv, 2));
+      geo.setIndex(faces);
+      geo.computeVertexNormals();
+      geo.computeBoundingBox();
+      geo.computeBoundingSphere();
+      geo.userData.map = geometry.userData.map;
+      return geo;
+    }
+
+    function removeDegenerates(geometry) {
+      bakeTransformsToGeometry();
+      const pos = geometry.attributes.position.array;
+      let index = geometry.index ? Array.from(geometry.index.array) : null;
+      const faces = [];
+
+      const checkFace = (i0, i1, i2) => {
+        const ax = pos[i0 * 3], ay = pos[i0 * 3 + 1], az = pos[i0 * 3 + 2];
+        const bx = pos[i1 * 3], by = pos[i1 * 3 + 1], bz = pos[i1 * 3 + 2];
+        const cx = pos[i2 * 3], cy = pos[i2 * 3 + 1], cz = pos[i2 * 3 + 2];
+        const abx = bx - ax, aby = by - ay, abz = bz - az;
+        const acx = cx - ax, acy = cy - ay, acz = cz - az;
+        const nx = aby * acz - abz * acy;
+        const ny = abz * acx - abx * acz;
+        const nz = abx * acy - aby * acx;
+        return (nx * nx + ny * ny + nz * nz) > 1e-20;
+      };
+
+      if (index) {
+        for (let i = 0; i < index.length; i += 3) {
+          if (checkFace(index[i], index[i + 1], index[i + 2])) {
+            faces.push(index[i], index[i + 1], index[i + 2]);
+          }
+        }
+      } else {
+        const vCount = pos.length / 3;
+        for (let i = 0; i < vCount; i += 3) {
+          if (checkFace(i, i + 1, i + 2)) faces.push(i, i + 1, i + 2);
+        }
+      }
+
+      const faceSet = new Set();
+      const uniqueFaces = [];
+      for (let i = 0; i < faces.length; i += 3) {
+        const a = faces[i], b = faces[i + 1], c = faces[i + 2];
+        const sorted = [a, b, c].sort((x, y) => x - y).join('_');
+        if (!faceSet.has(sorted)) {
+          faceSet.add(sorted);
+          uniqueFaces.push(a, b, c);
+        }
+      }
+
+      const geo = geometry.clone();
+      geo.setIndex(uniqueFaces);
+      geo.computeVertexNormals();
+      geo.computeBoundingBox();
+      geo.userData.map = geometry.userData.map;
+      return geo;
+    }
+
+    function fixNormals(geometry) {
+      bakeTransformsToGeometry();
+      const geo = geometry.clone();
+      geo.computeVertexNormals();
+      geo.userData.map = geometry.userData.map;
+      return geo;
+    }
+
+    function fillAdvancedHoles(geometry) {
+      bakeTransformsToGeometry();
+      let geo = weldVertices(geometry, 1e-4); 
+      const pos = geo.attributes.position.array;
+      const index = geo.index ? geo.index.array : null;
+      if (!index) return geo;
+      
+      const edgeMap = new Map(); 
+      const directedEdges = [];
+
+      for (let i = 0; i < index.length; i += 3) {
+        const i0 = index[i], i1 = index[i+1], i2 = index[i+2];
+        [[i0,i1], [i1,i2], [i2,i0]].forEach(([a, b]) => {
+          const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+          edgeMap.set(key, (edgeMap.get(key) || 0) + 1);
+          directedEdges.push({a, b, key});
+        });
+      }
+
+      const openEdges = directedEdges.filter(e => edgeMap.get(e.key) === 1);
+      if (openEdges.length === 0) return geo;
+
+      const nextNode = new Map();
+      openEdges.forEach(e => nextNode.set(e.a, e.b));
+
+      const loops = [];
+      const visited = new Set();
+      
+      openEdges.forEach(e => {
+        if (visited.has(e.a)) return;
+        const loop = [];
+        let curr = e.a;
+        while (curr !== undefined && !visited.has(curr)) {
+          visited.add(curr);
+          loop.push(curr);
+          curr = nextNode.get(curr);
+        }
+        if (loop.length > 2) loops.push(loop);
+      });
+
+      if (loops.length === 0) return geo;
+
+      const newPos = Array.from(pos);
+      const newIndex = Array.from(index);
+      let newVertexIdx = newPos.length / 3;
+
+      loops.forEach(loop => {
+        let cx=0, cy=0, cz=0;
+        loop.forEach(vi => {
+           cx += pos[vi*3]; cy += pos[vi*3+1]; cz += pos[vi*3+2];
+        });
+        cx /= loop.length; cy /= loop.length; cz /= loop.length;
+        
+        newPos.push(cx, cy, cz);
+        const centerIdx = newVertexIdx++;
+        
+        for (let i = 0; i < loop.length; i++) {
+          const v0 = loop[i];
+          const v1 = loop[(i + 1) % loop.length];
+          newIndex.push(v0, v1, centerIdx); 
+        }
+      });
+
+      const finalGeo = new THREE.BufferGeometry();
+      finalGeo.setAttribute('position', new THREE.Float32BufferAttribute(newPos, 3));
+      finalGeo.setIndex(newIndex);
+      finalGeo.computeVertexNormals();
+      finalGeo.computeBoundingBox();
+      if (geometry.userData.map) finalGeo.userData.map = geometry.userData.map;
+      return finalGeo;
+    }
+
+    function autoRepair(geometry) {
+      showProgress('Welding vertices…', 25);
+      let g = weldVertices(geometry, 1e-5);
+      showProgress('Removing degenerates…', 55);
+      g = removeDegenerates(g);
+      showProgress('Fixing normals…', 85);
+      g = fixNormals(g);
+      showProgress('Finishing…', 100);
+      return g;
+    }
+
+    // ---------- Buttons ----------
+    document.getElementById('btn-analyze').addEventListener('click', () => {
+      if (!currentGeometry) return;
+      runAnalysis(currentGeometry);
+    });
+
+    document.getElementById('btn-weld').addEventListener('click', () => {
+      if (!currentGeometry) return;
+      showProgress('Welding vertices…', 50);
+      const g = weldVertices(currentGeometry);
+      setMesh(g);
+      runAnalysis(g);
+      showSuccess('Duplicate vertices welded.');
+    });
+
+    document.getElementById('btn-clean').addEventListener('click', () => {
+      if (!currentGeometry) return;
+      showProgress('Cleaning geometry…', 50);
+      const g = removeDegenerates(currentGeometry);
+      setMesh(g);
+      runAnalysis(g);
+      showSuccess('Degenerate and duplicate faces removed.');
+    });
+
+    document.getElementById('btn-normals').addEventListener('click', () => {
+      if (!currentGeometry) return;
+      showProgress('Fixing normals…', 50);
+      const g = fixNormals(currentGeometry);
+      setMesh(g);
+      runAnalysis(g);
+      showSuccess('Normals recomputed and oriented.');
+    });
+
+    document.getElementById('btn-auto').addEventListener('click', async () => {
+      if (!currentGeometry) return;
+      const g = autoRepair(currentGeometry);
+      setMesh(g);
+      runAnalysis(g);
+      showSuccess('Auto repair finished. Check printability status.');
+    });
+
+    // ---------- Universal Exporting Logic ----------
+    async function exportModel(format) {
+      if (!currentMesh) return null;
+      bakeTransformsToGeometry();
+      
+      let blob;
+      if (format === 'stl') {
+        const exporter = new STLExporter();
+        const result = exporter.parse(currentMesh, { binary: true });
+        blob = new Blob([result], { type: 'application/octet-stream' });
+      } else if (format === 'obj') {
+        const exporter = new OBJExporter();
+        const result = exporter.parse(currentMesh);
+        blob = new Blob([result], { type: 'text/plain' });
+      } else if (format === 'ply') {
+        const exporter = new PLYExporter();
+        const result = exporter.parse(currentMesh, null, { binary: true });
+        blob = new Blob([result], { type: 'application/octet-stream' });
+      } else if (format === 'glb') {
+        const exporter = new GLTFExporter();
+        const result = await new Promise((res, rej) => exporter.parse(currentMesh, res, rej, { binary: true }));
+        blob = new Blob([result], { type: 'application/octet-stream' });
+      } else if (format === '3mf') {
+        const zipData = create3MF(currentMesh);
+        blob = new Blob([zipData], { type: 'application/vnd.ms-3mfdocument' });
+      }
+      return blob;
+    }
+
+    function create3MF(mesh) {
+      const pos = mesh.geometry.attributes.position.array;
+      const index = mesh.geometry.index ? mesh.geometry.index.array : null;
+      
+      const vCount = pos.length / 3;
+      const vertices = new Array(vCount);
+      for (let i = 0; i < vCount; i++) {
+        vertices[i] = `<vertex x="${pos[i*3]}" y="${pos[i*3+1]}" z="${pos[i*3+2]}" />`;
+      }
+
+      let triangles;
+      if (index) {
+        const tCount = index.length / 3;
+        triangles = new Array(tCount);
+        for (let i = 0; i < tCount; i++) {
+          triangles[i] = `<triangle v1="${index[i*3]}" v2="${index[i*3+1]}" v3="${index[i*3+2]}" />`;
+        }
+      } else {
+        const tCount = vCount / 3;
+        triangles = new Array(tCount);
+        for (let i = 0; i < tCount; i++) {
+          triangles[i] = `<triangle v1="${i*3}" v2="${i*3+1}" v3="${i*3+2}" />`;
+        }
+      }
+
+      const modelXML = `<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+  <resources>
+    <object id="1" type="model">
+      <mesh>
+        <vertices>
+${vertices.join('\n')}
+        </vertices>
+        <triangles>
+${triangles.join('\n')}
+        </triangles>
+      </mesh>
+    </object>
+  </resources>
+  <build>
+    <item objectid="1" />
+  </build>
+</model>`;
+
+      const relsXML = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" />
+</Relationships>`;
+
+      const contentTypesXML = `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" />
+  <Default Extension="model" ContentType="application/vnd.ms-3mfdocument" />
+</Types>`;
+
+      const zip = {
+        '3D': { '3dmodel.model': fflate.strToU8(modelXML) },
+        '_rels': { '.rels': fflate.strToU8(relsXML) },
+        '[Content_Types].xml': fflate.strToU8(contentTypesXML)
+      };
+
+      return fflate.zipSync(zip);
+    }
+
+    async function handleDownload() {
+      if (!currentMesh) return;
+      const format = exportFormatSelect.value;
+      
+      try {
+          const blob = await exportModel(format);
+          if(!blob) return;
+          
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${originalFileName}_fixed.${format}`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showSuccess(`Exported as ${format.toUpperCase()}`);
+      } catch (err) {
+          console.error(err);
+          showMessage('Export failed: ' + err.message);
+      }
+    }
+
+    document.getElementById('btn-download').addEventListener('click', handleDownload);
+
+    // Full Screen View logic
+    document.getElementById('btn-fullscreen').addEventListener('click', () => {
+      const viewer = document.getElementById('viewer-wrapper');
+      if (!document.fullscreenElement) {
+        viewer.requestFullscreen().catch(err => {
+          showMessage(`Error attempting to enable full-screen mode: ${err.message}`);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      const viewer = document.getElementById('viewer-wrapper');
+      const icon = document.getElementById('btn-fullscreen');
+      if (document.fullscreenElement) {
+        viewer.classList.remove('rounded-xl', 'border', 'border-slate-800');
+        icon.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 14h6m0 0v6m0-6l-7 7m17-11h-6m0 0V4m0 6l7-7M4 10h6m0 0V4m0 6l-7-7m17 11h-6m0 0v6m0-6l7 7"/></svg>`;
+      } else {
+        viewer.classList.add('rounded-xl', 'border', 'border-slate-800');
+        icon.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8V4m0 0h4M3 4l6 6M21 8V4m0 0h-4m4 0l-6 6M3 16v4m0 0h4m-4 0l6-6m12 6v-4m0 4h-4m4 0l-6-6"/></svg>`;
+      }
+      setTimeout(onResize, 100);
+    });
+
+    // Wireframe / solid toggle
+    document.getElementById('btn-wireframe').addEventListener('click', () => {
+      if (!currentMesh) return;
+      wireframeMode = true;
+      currentMesh.material.wireframe = true;
+      document.getElementById('btn-wireframe').classList.add('active');
+      document.getElementById('btn-solid').classList.remove('active');
+    });
+    document.getElementById('btn-solid').addEventListener('click', () => {
+      if (!currentMesh) return;
+      wireframeMode = false;
+      currentMesh.material.wireframe = false;
+      document.getElementById('btn-solid').classList.add('active');
+      document.getElementById('btn-wireframe').classList.remove('active');
+    });
+
+    document.getElementById('btn-reset-cam').addEventListener('click', () => {
+      if (currentMesh) fitCameraToMesh(currentMesh);
+    });
+    document.getElementById('btn-fit').addEventListener('click', () => {
+      if (currentMesh) fitCameraToMesh(currentMesh);
+    });
+
+    // Material swatches
+    document.querySelectorAll('.material-swatch').forEach(btn => {
+      btn.addEventListener('click', () => applyMaterial(btn.dataset.mat));
+    });
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    // Init
+    initViewer();
+  </script>
+</body>
+</html>
